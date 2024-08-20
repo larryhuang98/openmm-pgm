@@ -98,9 +98,6 @@ private:
     const pGM_MultipoleForce& owner;
     Kernel kernel;
 
-    static int CovalentDegrees[pGM_MultipoleForce::CovalentEnd];
-    static bool initializedCovalentDegrees;
-    static const int* getCovalentDegrees();
 };
 
 } // namespace OpenMM

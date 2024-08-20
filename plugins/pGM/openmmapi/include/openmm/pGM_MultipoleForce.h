@@ -98,12 +98,9 @@ public:
         //Extrapolated = 2
 
     };
-    // larry : AxisTypes
-    enum MultipoleAxisTypes { ZThenX = 0, Bisector = 1, ZBisect = 2, ThreeFold = 3, ZOnly = 4, NoAxisType = 5, LastAxisTypeIndex = 6 };
-    // larry : CovalentType
-    enum CovalentType {
-                          Covalent12 = 0, Covalent13 = 1, Covalent14 = 2, Covalent15 = 3,
-                          PolarizationCovalent11 = 4, PolarizationCovalent12 = 5, PolarizationCovalent13 = 6, PolarizationCovalent14 = 7, CovalentEnd = 8 };
+
+    // larry : CovalentType: Currently, we do not have covalent bonds here, we only have non-bonded interaction
+    enum CovalentType { Covalent = 0, nonInteractingCovalent = 1 };
 
     /**
      * Create an pGM_MultipoleForce.
@@ -237,7 +234,6 @@ public:
      *
      * @param charge               the particle's charge
      * @param molecularDipole      the particle's molecular dipole (vector of size 3)
-     * @param axisType             the particle's axis type
      * @param multipoleAtomZ       index of first atom used in constructing lab<->molecular frames
      * @param multipoleAtomX       index of second atom used in constructing lab<->molecular frames
      * @param multipoleAtomY       index of second atom used in constructing lab<->molecular frames
@@ -245,23 +241,18 @@ public:
      *
      * @return the index of the particle that was added
      */
-    int addMultipole(double charge, const std::vector<double>& molecularDipole, int axisType,
-                     int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double polarity);
-
+    int addMultipole(double charge, const std::vector<double>& molecularDipole, const std::vector<int>& covalentAtoms, double beta, double polarity);
+    // larry: note! need to add the beta value for each multipole
     /**
      * Get the multipole parameters for a particle.
      *
      * @param index                     the index of the atom for which to get parameters
      * @param[out] charge               the particle's charge
-     * @param[out] molecularDipole      the particle's molecular dipole (vector of size 3)
-     * @param[out] axisType             the particle's axis type
-     * @param[out] multipoleAtomZ       index of first atom used in constructing lab<->molecular frames
-     * @param[out] multipoleAtomX       index of second atom used in constructing lab<->molecular frames
-     * @param[out] multipoleAtomY       index of second atom used in constructing lab<->molecular frames
+     * @param[out] molecularDipole      the particle's molecular dipole (vector of size of total covalent bonds for an atom)
      * @param[out] polarity             polarity parameter
      */
     void getMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, 
-                                int& axisType, int& multipoleAtomZ, int& multipoleAtomX, int& multipoleAtomY,  double& polarity) const;
+                                std::vector<int>& covalentAtoms, double beta,  double& polarity) const;
 
     /**
      * Set the multipole parameters for a particle.
@@ -269,14 +260,12 @@ public:
      * @param index                the index of the atom for which to set parameters
      * @param charge               the particle's charge
      * @param molecularDipole      the particle's molecular dipole (vector of size 3)
-     * @param axisType             the particle's axis type
-     * @param multipoleAtomZ       index of first atom used in constructing lab<->molecular frames
-     * @param multipoleAtomX       index of second atom used in constructing lab<->molecular frames
-     * @param multipoleAtomY       index of second atom used in constructing lab<->molecular frames
+     * @param covalentAtoms        index of atoms for local dipoles
+     * @param beta                 the pGM Gaussian radius
      * @param polarity             polarity parameter
      */
-    void setMultipoleParameters(int index, double charge, const std::vector<double>& molecularDipole,
-                                int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double polarity);
+    void setMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, 
+                                const std::vector<int>& covalentAtoms, double beta,  double& polarity);
 
     /**
      * Set the CovalentMap for an atom
@@ -395,10 +384,7 @@ public:
      *
      * @param context      context
      * @param[out] outputMultipoleMoments (charge,
-                                           dipole_x, dipole_y, dipole_z,
-                                           quadrupole_xx, quadrupole_xy, quadrupole_xz,
-                                           quadrupole_yx, quadrupole_yy, quadrupole_yz,
-                                           quadrupole_zx, quadrupole_zy, quadrupole_zz)
+                                           dipole_x, dipole_y, dipole_z)
      */
     void getSystemMultipoleMoments(Context& context, std::vector< double >& outputMultipoleMoments);
     /**
@@ -447,44 +433,35 @@ private:
 class pGM_MultipoleForce::MultipoleInfo {
 public:
 
-    int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
-    double charge,  polarity;
+    int numCovalentBonds;
+
+    double charge,  polarity, beta;
 
     std::vector<double> molecularDipole;
-    std::vector<double> molecularQuadrupole;
+    
     std::vector< std::vector<int> > covalentInfo;
 
     MultipoleInfo() {
-        axisType = multipoleAtomZ = multipoleAtomX = multipoleAtomY = -1;
+
+        numCovalentBonds = 0;
+        
         charge   =  0.0;
 
-        molecularDipole.resize(3);
-        molecularQuadrupole.resize(9);
+        beta     =  1.0;
+
+        molecularDipole.resize(numCovalentBonds);
 
     }
 
-    MultipoleInfo(double charge, const std::vector<double>& inputMolecularDipole, const std::vector<double>& inputMolecularQuadrupole,
-                   int axisType, int multipoleAtomZ, int multipoleAtomX, int multipoleAtomY, double thole, double dampingFactor, double polarity) :
-        axisType(axisType), multipoleAtomZ(multipoleAtomZ), multipoleAtomX(multipoleAtomX), multipoleAtomY(multipoleAtomY),
-        charge(charge),  polarity(polarity) {
+    MultipoleInfo(double charge, const std::vector<double>& inputMolecularDipole, double polarity, int numCovalentBonds) : charge(charge),  polarity(polarity) {
 
-       covalentInfo.resize(CovalentEnd);
+       covalentInfo.resize(numCovalentBonds);
 
        molecularDipole.resize(3);
-       molecularDipole[0]          = inputMolecularDipole[0];
-       molecularDipole[1]          = inputMolecularDipole[1];
-       molecularDipole[2]          = inputMolecularDipole[2];
+       for (int ii; ii < numCovalentBonds; ii++) {
+            molecularDipole[ii]    = inputMolecularDipole[ii];
+       }
 
-       molecularQuadrupole.resize(9);
-       molecularQuadrupole[0]      = inputMolecularQuadrupole[0];
-       molecularQuadrupole[1]      = inputMolecularQuadrupole[1];
-       molecularQuadrupole[2]      = inputMolecularQuadrupole[2];
-       molecularQuadrupole[3]      = inputMolecularQuadrupole[3];
-       molecularQuadrupole[4]      = inputMolecularQuadrupole[4];
-       molecularQuadrupole[5]      = inputMolecularQuadrupole[5];
-       molecularQuadrupole[6]      = inputMolecularQuadrupole[6];
-       molecularQuadrupole[7]      = inputMolecularQuadrupole[7];
-       molecularQuadrupole[8]      = inputMolecularQuadrupole[8];
     }
 };
 

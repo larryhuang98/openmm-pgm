@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- *
- *                               OpenMMpGM                                 *
+ *                                OpenMM_pGM                                  *
  * -------------------------------------------------------------------------- *
  * This is part of the OpenMM molecular simulation toolkit originating from   *
  * Simbios, the NIH National Center for Physics-Based Simulation of           *
@@ -39,8 +39,6 @@ using namespace OpenMM;
 
 using std::vector;
 
-bool pGM_MultipoleForceImpl::initializedCovalentDegrees = false;
-int pGM_MultipoleForceImpl::CovalentDegrees[]           = { 1,2,3,4,0,1,2,3};
 
 pGM_MultipoleForceImpl::pGM_MultipoleForceImpl(const pGM_MultipoleForce& owner) : owner(owner) {
 }
@@ -66,79 +64,22 @@ void pGM_MultipoleForceImpl::initialize(ContextImpl& context) {
     }
 
     
-    for (int ii = 0; ii < numParticles; ii++) {
-
-        int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
-        double charge, polarity ;
-        std::vector<double> molecularDipole;
-
-
-        owner.getMultipoleParameters(ii, charge, molecularDipole, molecularQuadrupole, axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY,
-                                     polarity);
-
-
-       // only 'Z-then-X', 'Bisector', Z-Bisect, ThreeFold  currently handled
-
-        if (axisType != pGM_MultipoleForce::ZThenX     && axisType != pGM_MultipoleForce::Bisector &&
-            axisType != pGM_MultipoleForce::ZBisect    && axisType != pGM_MultipoleForce::ThreeFold &&
-            axisType != pGM_MultipoleForce::ZOnly      && axisType != pGM_MultipoleForce::NoAxisType) {
-             std::stringstream buffer;
-             buffer << "pGM_MultipoleForce: axis type=" << axisType;
-             buffer << " not currently handled - only axisTypes[ ";
-             buffer << pGM_MultipoleForce::ZThenX   << ", " << pGM_MultipoleForce::Bisector  << ", ";
-             buffer << pGM_MultipoleForce::ZBisect  << ", " << pGM_MultipoleForce::ThreeFold << ", ";
-             buffer << pGM_MultipoleForce::NoAxisType;
-             buffer << "] (ZThenX, Bisector, Z-Bisect, ThreeFold, NoAxisType) currently handled .";
-             throw OpenMMException(buffer.str());
-        }
-        if (axisType != pGM_MultipoleForce::NoAxisType && (multipoleAtomZ < 0 || multipoleAtomZ >= numParticles)) {
-            std::stringstream buffer;
-            buffer << "pGM_MultipoleForce: invalid z axis particle: " << multipoleAtomZ;
-            throw OpenMMException(buffer.str());
-        }
-        if (axisType != pGM_MultipoleForce::NoAxisType && axisType != pGM_MultipoleForce::ZOnly &&
-                (multipoleAtomX < 0 || multipoleAtomX >= numParticles)) {
-            std::stringstream buffer;
-            buffer << "pGM_MultipoleForce: invalid x axis particle: " << multipoleAtomX;
-            throw OpenMMException(buffer.str());
-        }
-        if ((axisType == pGM_MultipoleForce::ZBisect || axisType == pGM_MultipoleForce::ThreeFold) &&
-                (multipoleAtomY < 0 || multipoleAtomY >= numParticles)) {
-            std::stringstream buffer;
-            buffer << "pGM_MultipoleForce: invalid y axis particle: " << multipoleAtomY;
-            throw OpenMMException(buffer.str());
-        }
-    }
-    kernel = context.getPlatform().createKernel(CalcpGM_MultipoleForceKernel::Name(), context);
-    kernel.getAs<CalcpGM_MultipoleForceKernel>().initialize(context.getSystem(), owner);
+    kernel = context.getPlatform().createKernel(Calc_pGM_MultipoleForceKernel::Name(), context);
+    kernel.getAs<Calc_pGM_MultipoleForceKernel>().initialize(context.getSystem(), owner);
 }
 
 double pGM_MultipoleForceImpl::calcForcesAndEnergy(ContextImpl& context, bool includeForces, bool includeEnergy, int groups) {
     if ((groups&(1<<owner.getForceGroup())) != 0)
-        return kernel.getAs<CalcpGM_MultipoleForceKernel>().execute(context, includeForces, includeEnergy);
+        return kernel.getAs<Calc_pGM_MultipoleForceKernel>().execute(context, includeForces, includeEnergy);
     return 0.0;
 }
 
 std::vector<std::string> pGM_MultipoleForceImpl::getKernelNames() {
     std::vector<std::string> names;
-    names.push_back(CalcpGM_MultipoleForceKernel::Name());
+    names.push_back(Calc_pGM_MultipoleForceKernel::Name());
     return names;
 }
 
-const int* pGM_MultipoleForceImpl::getCovalentDegrees() {
-    if (!initializedCovalentDegrees) {
-        initializedCovalentDegrees                                      = true;
-        CovalentDegrees[pGM_MultipoleForce::Covalent12]               = 1;
-        CovalentDegrees[pGM_MultipoleForce::Covalent13]               = 2;
-        CovalentDegrees[pGM_MultipoleForce::Covalent14]               = 3;
-        CovalentDegrees[pGM_MultipoleForce::Covalent15]               = 4;
-        CovalentDegrees[pGM_MultipoleForce::PolarizationCovalent11]   = 0;
-        CovalentDegrees[pGM_MultipoleForce::PolarizationCovalent12]   = 1;
-        CovalentDegrees[pGM_MultipoleForce::PolarizationCovalent13]   = 2;
-        CovalentDegrees[pGM_MultipoleForce::PolarizationCovalent14]   = 3;
-    }
-    return CovalentDegrees;
-}
 
 void pGM_MultipoleForceImpl::getCovalentRange(const pGM_MultipoleForce& force, int atomIndex, const std::vector<pGM_MultipoleForce::CovalentType>& lists,
                                                 int* minCovalentIndex, int* maxCovalentIndex) {
@@ -161,41 +102,33 @@ void pGM_MultipoleForceImpl::getCovalentRange(const pGM_MultipoleForce& force, i
     return;
 }
 
-void pGM_MultipoleForceImpl::getCovalentDegree(const pGM_MultipoleForce& force, std::vector<int>& covalentDegree) {
-    covalentDegree.resize(pGM_MultipoleForce::CovalentEnd);
-    const int* CovalentDegrees = pGM_MultipoleForceImpl::getCovalentDegrees();
-    for (unsigned int kk = 0; kk < pGM_MultipoleForce::CovalentEnd; kk++) {
-        covalentDegree[kk] = CovalentDegrees[kk];
-    }
-    return;
-}
 
 void pGM_MultipoleForceImpl::getLabFramePermanentDipoles(ContextImpl& context, vector<Vec3>& dipoles) {
-    kernel.getAs<CalcpGM_MultipoleForceKernel>().getLabFramePermanentDipoles(context, dipoles);
+    kernel.getAs<Calc_pGM_MultipoleForceKernel>().getLabFramePermanentDipoles(context, dipoles);
 }
 
 void pGM_MultipoleForceImpl::getInducedDipoles(ContextImpl& context, vector<Vec3>& dipoles) {
-    kernel.getAs<CalcpGM_MultipoleForceKernel>().getInducedDipoles(context, dipoles);
+    kernel.getAs<Calc_pGM_MultipoleForceKernel>().getInducedDipoles(context, dipoles);
 }
 
 void pGM_MultipoleForceImpl::getTotalDipoles(ContextImpl& context, vector<Vec3>& dipoles) {
-    kernel.getAs<CalcpGM_MultipoleForceKernel>().getTotalDipoles(context, dipoles);
+    kernel.getAs<Calc_pGM_MultipoleForceKernel>().getTotalDipoles(context, dipoles);
 }
 
 void pGM_MultipoleForceImpl::getElectrostaticPotential(ContextImpl& context, const std::vector< Vec3 >& inputGrid,
                                                          std::vector< double >& outputElectrostaticPotential) {
-    kernel.getAs<CalcpGM_MultipoleForceKernel>().getElectrostaticPotential(context, inputGrid, outputElectrostaticPotential);
+    kernel.getAs<Calc_pGM_MultipoleForceKernel>().getElectrostaticPotential(context, inputGrid, outputElectrostaticPotential);
 }
 
 void pGM_MultipoleForceImpl::getSystemMultipoleMoments(ContextImpl& context, std::vector< double >& outputMultipoleMoments) {
-    kernel.getAs<CalcpGM_MultipoleForceKernel>().getSystemMultipoleMoments(context, outputMultipoleMoments);
+    kernel.getAs<Calc_pGM_MultipoleForceKernel>().getSystemMultipoleMoments(context, outputMultipoleMoments);
 }
 
 void pGM_MultipoleForceImpl::updateParametersInContext(ContextImpl& context) {
-    kernel.getAs<CalcpGM_MultipoleForceKernel>().copyParametersToContext(context, owner);
+    kernel.getAs<Calc_pGM_MultipoleForceKernel>().copyParametersToContext(context, owner);
     context.systemChanged();
 }
 
 void pGM_MultipoleForceImpl::getPMEParameters(double& alpha, int& nx, int& ny, int& nz) const {
-    kernel.getAs<CalcpGM_MultipoleForceKernel>().getPMEParameters(alpha, nx, ny, nz);
+    kernel.getAs<Calc_pGM_MultipoleForceKernel>().getPMEParameters(alpha, nx, ny, nz);
 }
