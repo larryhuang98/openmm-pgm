@@ -60,19 +60,19 @@ public:
          * No cutoff is applied to nonbonded interactions.  The full set of N^2 interactions is computed exactly.
          * This necessarily means that periodic boundary conditions cannot be used.  This is the default.
          */
-        // NoCutoff = 0, to be implemented
+        NoCutoff = 0,// to be implemented
 
         /**
          * Periodic boundary conditions are used, and Particle-Mesh Ewald (PME) summation is used to compute the interaction of each particle
          * with all periodic copies of every other particle.
          */
-        PME = 1
+        PME = 1,
 
         /**
          * Isotropic periodic sum, will be implemented later
          * 
          */
-        // IPS = 1
+        IPS = 2
     };
 
     enum PolarizationType {
@@ -252,7 +252,7 @@ public:
      * @param[out] polarity             polarity parameter
      */
     void getMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, 
-                                std::vector<int>& covalentAtoms, double beta,  double& polarity) const;
+                                double& beta,  double& polarity) const;
 
     /**
      * Set the multipole parameters for a particle.
@@ -362,16 +362,7 @@ public:
      */
     void getTotalDipoles(Context& context, std::vector<Vec3>& dipoles);
 
-    /**
-     * Get the electrostatic potential.
-     *
-     * @param inputGrid    input grid points over which the potential is to be evaluated
-     * @param context      context
-     * @param[out] outputElectrostaticPotential output potential
-     */
 
-    void getElectrostaticPotential(const std::vector< Vec3 >& inputGrid,
-                                    Context& context, std::vector< double >& outputElectrostaticPotential);
 
     /**
      * Get the system multipole moments.

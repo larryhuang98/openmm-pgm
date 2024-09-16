@@ -312,7 +312,7 @@ public:
          * Periodic boundary conditions are used, and Particle-Mesh Ewald (PME) summation is used to compute the interaction of each particle
          * with all periodic copies of every other particle.
          */
-        PME = 1
+        PME = 1, IPS = 2
     };
 
     enum PolarizationType {
@@ -443,6 +443,7 @@ public:
     double calculateForceAndEnergy(const std::vector<OpenMM::Vec3>& particlePositions,
                                    const std::vector<double>& charges,
                                    const std::vector<double>& dipoles,
+                                   const std::vector<double>& beta,
                                    const std::vector<double>& polarity,
                                    const std::vector< std::vector< std::vector<int> > >& multipoleAtomCovalentInfo,
                                    std::vector<OpenMM::Vec3>& forces);
@@ -461,6 +462,7 @@ public:
     void calculateInducedDipoles(const std::vector<OpenMM::Vec3>& particlePositions,
                                  const std::vector<double>& charges,
                                  const std::vector<double>& dipoles,
+                                 const std::vector<double>& beta,
                                  const std::vector<double>& polarity,
                                  const std::vector< std::vector< std::vector<int> > >& multipoleAtomCovalentInfo,
                                  std::vector<Vec3>& outputInducedDipoles);
@@ -480,6 +482,7 @@ public:
     void calculateLabFramePermanentDipoles(const std::vector<Vec3>& particlePositions,
                                            const std::vector<double>& charges,
                                            const std::vector<double>& dipoles,
+                                           const std::vector<double>& beta,
                                            const std::vector<double>& polarity,
                                            const std::vector< std::vector< std::vector<int> > >& multipoleAtomCovalentInfo,
                                            std::vector<Vec3>& outputPermanentDipoles);
@@ -500,6 +503,7 @@ public:
     void calculateTotalDipoles(const std::vector<Vec3>& particlePositions,
                                const std::vector<double>& charges,
                                const std::vector<double>& dipoles,
+                               const std::vector<double>& beta,
                                const std::vector<double>& polarity,
                                const std::vector< std::vector< std::vector<int> > >& multipoleAtomCovalentInfo,
                                std::vector<Vec3>& outputTotalDipoles);
@@ -521,28 +525,12 @@ public:
                                                const std::vector<OpenMM::Vec3>& particlePositions,
                                                const std::vector<double>& charges,
                                                const std::vector<double>& dipoles,
+                                               const std::vector<double>& beta,
                                                const std::vector<double>& polarity,
                                                const std::vector< std::vector< std::vector<int> > >& multipoleAtomCovalentInfo,
                                                std::vector<double>& outputMultipoleMoments);
 
-    /**
-     * Calculate electrostatic potential at a set of grid points.
-     *
-     * @param particlePositions         Cartesian coordinates of particles
-     * @param charges                   scalar charges for each particle
-     * @param dipoles                   molecular frame dipoles for each particle
-     * @param polarity                  polarity for each particle
-     * @param multipoleAtomCovalentInfo covalent info needed to set scaling factors
-     * @param input grid                input grid points to compute potential
-     * @param outputPotential           output electrostatic potential
-     */
-    void calculateElectrostaticPotential(const std::vector<OpenMM::Vec3>& particlePositions,
-                                         const std::vector<double>& charges,
-                                         const std::vector<double>& dipoles,
-                                         const std::vector<double>& polarity,
-                                         const std::vector< std::vector< std::vector<int> > >& multipoleAtomCovalentInfo,
-                                         const std::vector<Vec3>& inputGrid,
-                                         std::vector<double>& outputPotential);
+
 
 protected:
 
@@ -638,6 +626,7 @@ protected:
     void loadParticleData(const std::vector<OpenMM::Vec3>& particlePositions, 
                           const std::vector<double>& charges,
                           const std::vector<double>& dipoles,
+                          const std::vector<double>& beta,
                           const std::vector<double>& polarity,
                           const std::vector< std::vector< std::vector<int> > >& multipoleAtomCovalentInfo,
                           std::vector<MultipoleParticleData>& particleData) const;
@@ -732,7 +721,7 @@ protected:
     virtual void calculateInducedDipoleFields(const std::vector<MultipoleParticleData>& particleData,
                                               std::vector<UpdateInducedDipoleFieldStruct>& updateInducedDipoleFields);
 
-    void convergeInduceDipolesByCG(const vector<MultipoleParticleData>& particleData, vector<UpdateInducedDipoleFieldStruct>& updateInducedDipoleField);
+    void convergeInduceDipolesByCG(const std::vector<MultipoleParticleData>& particleData, std::vector<UpdateInducedDipoleFieldStruct>& updateInducedDipoleField);
     /**
      * Converge induced dipoles.
      * 
@@ -767,6 +756,7 @@ protected:
      * @param particlePositions         Cartesian coordinates of particles
      * @param charges                   scalar charges for each particle
      * @param dipoles                   molecular frame dipoles for each particle
+     * @param beta                      Gaussian radius
      * @param polarity                  polarity for each particle
      * @param multipoleAtomCovalentInfo covalent info needed to set scaling factors
      * @param particleData              output vector of parameters (charge, labFrame dipoles, quadrupoles, ...) for particles
@@ -775,6 +765,7 @@ protected:
     void setup(const std::vector<OpenMM::Vec3>& particlePositions,
                const std::vector<double>& charges,
                const std::vector<double>& dipoles,
+               const std::vector<double>& beta,
                const std::vector<double>& polarity,
                const std::vector< std::vector< std::vector<int> > >& multipoleAtomCovalentInfo,
                std::vector<MultipoleParticleData>& particleData);
@@ -789,7 +780,7 @@ protected:
      * @param torque            vector of particle torques to be updated
      */
     double calculateElectrostaticPairIxn(const MultipoleParticleData& particleI, const MultipoleParticleData& particleK,
-                                         const std::vector<double>& scalingFactors, std::vector<OpenMM::Vec3>& forces, std::vector<Vec3>& torque) const;
+                                         std::vector<OpenMM::Vec3>& forces) const;
 
 
     /**
@@ -802,7 +793,6 @@ protected:
      * @return energy
      */
     virtual double calculateElectrostatic(const std::vector<MultipoleParticleData>& particleData, 
-                                          std::vector<OpenMM::Vec3>& torques,
                                           std::vector<OpenMM::Vec3>& forces);
 
     /**
@@ -840,16 +830,6 @@ protected:
      */
     void copyVec3Vector(const std::vector<OpenMM::Vec3>& inputVector, std::vector<OpenMM::Vec3>& outputVector) const;
 
-    /**
-     * Calculate potential at grid point due to a particle
-     *
-     * @param particleData            vector of parameters (charge, labFrame dipoles, quadrupoles, ...) for particles
-     * @param gridPoint               grid point
-     *
-     * @return potential at grid point
-     * 
-     */
-    double calculateElectrostaticPotentialForParticleGridPoint(const MultipoleParticleData& particleI, const Vec3& gridPoint) const;
 
     /**
      * Apply periodic boundary conditions to difference in positions
@@ -860,6 +840,51 @@ protected:
     virtual void getPeriodicDelta(Vec3& deltaR) const {};
 };
 
+class pGM_ReferenceIPSMultipoleForce : public pGM_ReferenceMultipoleForce {
+
+public:
+
+    /**
+     * Constructor
+     * 
+     */
+    pGM_ReferenceIPSMultipoleForce();
+ 
+    /**
+     * Destructor
+     * 
+     */
+    ~pGM_ReferenceIPSMultipoleForce();
+ 
+    /**
+     * Get cutoff distance.
+     *
+     * @return cutoff distance
+     *
+     */
+    double getCutoffDistance() const;
+
+    /**
+     * Set cutoff distance.
+     *
+     * @return cutoff distance
+     *
+     */
+    void setCutoffDistance(double cutoffDistance);
+
+
+    /**
+     * Calculate electrostatic forces.
+     * 
+     * @param particleData            vector of parameters (charge, labFrame dipoles, quadrupoles, ...) for particles
+     * @param forces                  output forces 
+     *
+     * @return energy
+     */
+    double calculateElectrostatic(const std::vector<MultipoleParticleData>& particleData, 
+                                  std::vector<OpenMM::Vec3>& forces);
+
+};
 
 class pGM_ReferencePmeMultipoleForce : public pGM_ReferenceMultipoleForce {
 

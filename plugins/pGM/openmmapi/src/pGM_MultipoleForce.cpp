@@ -51,8 +51,8 @@ pGM_MultipoleForce::NonbondedMethod pGM_MultipoleForce::getNonbondedMethod() con
 }
 
 void pGM_MultipoleForce::setNonbondedMethod(pGM_MultipoleForce::NonbondedMethod method) {
-    if (method < 0 || method > 1)
-        throw OpenMMException("pGM_MultipoleForce: Illegal value for nonbonded method, currently pGM model only supports PME method");
+    if (method < 0 || method > 2)
+        throw OpenMMException("pGM_MultipoleForce: Illegal value for nonbonded method, currently pGM model only supports PME method and IPS method");
     nonbondedMethod = method;
 }
 
@@ -149,18 +149,17 @@ int pGM_MultipoleForce::addMultipole(double charge, const std::vector<double>& m
 }
 
 void pGM_MultipoleForce::getMultipoleParameters(int index, double& charge, std::vector<double>& molecularDipole, 
-                                std::vector<int>& covalentAtoms, double beta,  double& polarity) const {
+                                double& beta, double& polarity) const {
     charge                      = multipoles[index].charge;
-
-    covalentAtoms               = multipoles[index].covalentInfo[0];
 
     beta                        = multipoles[index].beta;
 
+    
+    std::vector<int> covalentAtoms=multipoles[index].covalentInfo[0];
     molecularDipole.resize(covalentAtoms.size());
-    for (int ii=0; ii< covalentAtoms.size(); ii++){
+    for (int ii=0; ii< covalentAtoms.size(); ii++) {
         molecularDipole[ii]          = multipoles[index].molecularDipole[ii];
     }
-
 
     polarity                    = multipoles[index].polarity;
 }
@@ -169,14 +168,11 @@ void pGM_MultipoleForce::setMultipoleParameters(int index, double& charge, std::
                                 const std::vector<int>& covalentAtoms, double beta,  double& polarity) {
 
     multipoles[index].charge                      = charge;
-
-    multipoles[index].molecularDipole[0]          = molecularDipole[0];
-    multipoles[index].molecularDipole[1]          = molecularDipole[1];
-    multipoles[index].molecularDipole[2]          = molecularDipole[2];
-
-
+    for (int ii=0; ii< covalentAtoms.size(); ii++) {
+        multipoles[index].molecularDipole[ii]     = molecularDipole[ii];
+    }
+    multipoles[index].beta                        = beta;
     multipoles[index].polarity                    = polarity;
-
 }
 
 void pGM_MultipoleForce::setCovalentMap(int index, CovalentType typeId, const std::vector<int>& covalentAtoms) {
@@ -225,9 +221,7 @@ void pGM_MultipoleForce::getTotalDipoles(Context& context, vector<Vec3>& dipoles
     dynamic_cast<pGM_MultipoleForceImpl&>(getImplInContext(context)).getTotalDipoles(getContextImpl(context), dipoles);
 }
 
-void pGM_MultipoleForce::getElectrostaticPotential(const std::vector< Vec3 >& inputGrid, Context& context, std::vector< double >& outputElectrostaticPotential) {
-    dynamic_cast<pGM_MultipoleForceImpl&>(getImplInContext(context)).getElectrostaticPotential(getContextImpl(context), inputGrid, outputElectrostaticPotential);
-}
+
 
 void pGM_MultipoleForce::getSystemMultipoleMoments(Context& context, std::vector< double >& outputMultipoleMoments) {
     dynamic_cast<pGM_MultipoleForceImpl&>(getImplInContext(context)).getSystemMultipoleMoments(getContextImpl(context), outputMultipoleMoments);

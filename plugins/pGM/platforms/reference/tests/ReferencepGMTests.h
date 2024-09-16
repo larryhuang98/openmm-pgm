@@ -1,16 +1,13 @@
-#ifndef OPENMMpGM_H_
-#define OPENMMpGM_H_
-
 /* -------------------------------------------------------------------------- *
- *                               OpenMMAmoeba                                 *
+ *                                   OpenMM                                   *
  * -------------------------------------------------------------------------- *
  * This is part of the OpenMM molecular simulation toolkit originating from   *
  * Simbios, the NIH National Center for Physics-Based Simulation of           *
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org.               *
  *                                                                            *
- * Portions copyright (c) 2009 Stanford University and the Authors.           *
- * Authors:                                                                   *
+ * Portions copyright (c) 2013 Stanford University and the Authors.           *
+ * Authors: Peter Eastman                                                     *
  * Contributors:                                                              *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -32,8 +29,14 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
+#include "ReferenceTests.h"
 
-#include "openmm/pGM_MultipoleForce.h"
+extern "C" void register_pGM_ReferenceKernelFactories();
 
+using namespace OpenMM;
 
-#endif /*OPENMMpGM_H_*/
+void setupKernels (int argc, char* argv[]) {
+    register_pGM_ReferenceKernelFactories();
+    platform = dynamic_cast<ReferencePlatform&>(Platform::getPlatformByName("Reference"));
+    
+}

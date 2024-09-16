@@ -86,8 +86,6 @@ public:
     void getInducedDipoles(ContextImpl& context, std::vector<Vec3>& dipoles);
     void getTotalDipoles(ContextImpl& context, std::vector<Vec3>& dipoles);
 
-    void getElectrostaticPotential(ContextImpl& context, const std::vector< Vec3 >& inputGrid,
-                                   std::vector< double >& outputElectrostaticPotential);
 
     void getSystemMultipoleMoments(ContextImpl& context, std::vector< double >& outputMultipoleMoments);
     void updateParametersInContext(ContextImpl& context);

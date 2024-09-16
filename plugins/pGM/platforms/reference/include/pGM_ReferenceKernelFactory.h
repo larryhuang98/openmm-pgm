@@ -2,7 +2,7 @@
 #define OPENMM_pGM_REFERERENCE_KERNEL_FACTORY_H_
 
 /* -------------------------------------------------------------------------- *
- *                            OpenMMAmoeba                                    *
+ *                            OpenMMpGM                                    *
  * -------------------------------------------------------------------------- *
  * This is part of the OpenMM molecular simulation toolkit originating from   *
  * Simbios, the NIH National Center for Physics-Based Simulation of           *

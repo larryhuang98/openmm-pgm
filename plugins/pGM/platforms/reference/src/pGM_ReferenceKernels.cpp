@@ -68,7 +68,7 @@ ReferenceCalc_pGM_MultipoleForceKernel::ReferenceCalc_pGM_MultipoleForceKernel(c
 ReferenceCalc_pGM_MultipoleForceKernel::~ReferenceCalc_pGM_MultipoleForceKernel() {
 }
 
-void ReferenceCalc_pGM_MultipoleForceKernel::initialize(const System& system, const _pGM_MultipoleForce& force) {
+void ReferenceCalc_pGM_MultipoleForceKernel::initialize(const System& system, const pGM_MultipoleForce& force) {
 
     numMultipoles   = force.getNumMultipoles();
 
@@ -77,36 +77,26 @@ void ReferenceCalc_pGM_MultipoleForceKernel::initialize(const System& system, co
     polarity.resize(numMultipoles);
     multipoleAtomCovalentInfo.resize(numMultipoles);
 
-    int dipoleIndex      = 0;
-    int quadrupoleIndex  = 0;
     double totalCharge   = 0.0;
+    int dipoleIndex = 0;
     for (int ii = 0; ii < numMultipoles; ii++) {
 
         // multipoles
-
-        int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
-        double charge, tholeD, dampingFactorD, polarityD;
+        double charge, betaD , polarityD;
         std::vector<double> dipolesD;
-        std::vector<double> quadrupolesD;
-        force.getMultipoleParameters(ii, charge, dipolesD, quadrupolesD, axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY,
-                                     tholeD, dampingFactorD, polarityD);
+        std::vector<int> covalentAtoms;
+        force.getMultipoleParameters(ii, charge, dipolesD, betaD, polarityD);
 
         totalCharge                       += charge;
-        axisTypes[ii]                      = axisType;
-        multipoleAtomZs[ii]                = multipoleAtomZ;
-        multipoleAtomXs[ii]                = multipoleAtomX;
-        multipoleAtomYs[ii]                = multipoleAtomY;
-
-        charges[ii]                        = charge;
-        tholes[ii]                         = tholeD;
-        dampingFactors[ii]                 = dampingFactorD;
-        polarity[ii]                       = polarityD;
-
-        dipoles[dipoleIndex++]             = dipolesD[0];
-        dipoles[dipoleIndex++]             = dipolesD[1];
-        dipoles[dipoleIndex++]             = dipolesD[2];
         
 
+        charges[ii]                        = charge;
+        polarity[ii]                       = polarityD;
+
+        int n = sizeof(dipolesD);
+        for (int jj=0; jj < n; jj++){
+            dipoles[dipoleIndex++] = dipolesD[jj];
+        }
         // covalent info
 
         std::vector< std::vector<int> > covalentLists;
@@ -115,13 +105,10 @@ void ReferenceCalc_pGM_MultipoleForceKernel::initialize(const System& system, co
 
     }
 
-    polarizationType = force.getPolarizationType();
-    if (polarizationType == pGM_MultipoleForce::Mutual) {
-        mutualInducedMaxIterations = force.getMutualInducedMaxIterations();
-        mutualInducedTargetEpsilon = force.getMutualInducedTargetEpsilon();
-    } else  {
-        throw OPENMMException();
-    }
+
+    mutualInducedMaxIterations = force.getMutualInducedMaxIterations();
+    mutualInducedTargetEpsilon = force.getMutualInducedTargetEpsilon();
+
 
     // PME
 
@@ -150,56 +137,53 @@ void ReferenceCalc_pGM_MultipoleForceKernel::initialize(const System& system, co
 pGM_ReferenceMultipoleForce* ReferenceCalc_pGM_MultipoleForceKernel::setup_pGM_ReferenceMultipoleForce(ContextImpl& context)
 {
 
-    // amoebaReferenceMultipoleForce is set to _pGM_ReferenceGeneralizedKirkwoodForce if _pGM_GeneralizedKirkwoodForce is present
-    // amoebaReferenceMultipoleForce is set to _pGM_ReferencePmeMultipoleForce if 'usePme' is set
-    // amoebaReferenceMultipoleForce is set to _pGM_ReferenceMultipoleForce otherwise
+    // pgm_ReferenceMultipoleForce is set to _pGM_ReferenceGeneralizedKirkwoodForce if _pGM_GeneralizedKirkwoodForce is present
+    // pgm_ReferenceMultipoleForce is set to _pGM_ReferencePmeMultipoleForce if 'usePme' is set
+    // pgm_ReferenceMultipoleForce is set to _pGM_ReferenceMultipoleForce otherwise
 
 
-    pGM_ReferenceMultipoleForce* amoebaReferenceMultipoleForce = NULL;
+    pGM_ReferenceMultipoleForce* pgm_ReferenceMultipoleForce = NULL;
+    /*
     if (usePme) {
-
-        pGM_ReferencePmeMultipoleForce* amoebaReferencePmeMultipoleForce = new pGM_ReferencePmeMultipoleForce();
-        amoebaReferencePmeMultipoleForce->setAlphaEwald(alphaEwald);
-        amoebaReferencePmeMultipoleForce->setCutoffDistance(cutoffDistance);
-        amoebaReferencePmeMultipoleForce->setPmeGridDimensions(pmeGridDimension);
+        pGM_ReferencePmeMultipoleForce* pgm_ReferencePmeMultipoleForce = new pGM_ReferencePmeMultipoleForce();
+        pgm_ReferencePmeMultipoleForce->setAlphaEwald(alphaEwald);
+        pgm_ReferencePmeMultipoleForce->setCutoffDistance(cutoffDistance);
+        pgm_ReferencePmeMultipoleForce->setPmeGridDimensions(pmeGridDimension);
         Vec3* boxVectors = extractBoxVectors(context);
         double minAllowedSize = 1.999999*cutoffDistance;
         if (boxVectors[0][0] < minAllowedSize || boxVectors[1][1] < minAllowedSize || boxVectors[2][2] < minAllowedSize) {
             throw OpenMMException("The periodic box size has decreased to less than twice the nonbonded cutoff.");
         }
-        amoebaReferencePmeMultipoleForce->setPeriodicBoxSize(boxVectors);
-        amoebaReferenceMultipoleForce = static_cast<pGM_ReferenceMultipoleForce*>(amoebaReferencePmeMultipoleForce);
+        pgm_ReferencePmeMultipoleForce->setPeriodicBoxSize(boxVectors);
+        pgm_ReferenceMultipoleForce = static_cast<pGM_ReferenceMultipoleForce*>(pgm_ReferencePmeMultipoleForce);
 
+    } else if (useIPS) {
+        pGM_ReferenceIPSMultipoleForce* pgm_ReferenceIPSMultipoleForce = new pGM_ReferenceIPSMultipoleForce();
+        pgm_ReferenceIPSMultipoleForce->setCutoffDistance(cutoffDistance);
+        pgm_ReferenceMultipoleForce = static_cast<pGM_ReferenceMultipoleForce*>(pgm_ReferenceIPSMultipoleForce);
     } else {
-         throw OpenMMException("Currently, pGM force field only supports PME method, in the future, other methods will be implemented.");
+         throw OpenMMException("Currently, pGM force field only supports PME and IPS method, in the future, other methods will be implemented.");
     }
+*/
+    pgm_ReferenceMultipoleForce->setPolarizationType(pGM_ReferenceMultipoleForce::Mutual);//to be removed?
+    pgm_ReferenceMultipoleForce->setMutualInducedDipoleTargetEpsilon(mutualInducedTargetEpsilon);
+    pgm_ReferenceMultipoleForce->setMaximumMutualInducedDipoleIterations(mutualInducedMaxIterations);
 
-    // set polarization type
 
-    if (polarizationType == pGM_MultipoleForce::Mutual) {
-        amoebaReferenceMultipoleForce->setPolarizationType(pGM_ReferenceMultipoleForce::Mutual);
-        amoebaReferenceMultipoleForce->setMutualInducedDipoleTargetEpsilon(mutualInducedTargetEpsilon);
-        amoebaReferenceMultipoleForce->setMaximumMutualInducedDipoleIterations(mutualInducedMaxIterations);
-    } else {
-        throw OpenMMException("Currently, pGM force field only supports mutual induced dipole.");
-    }
-
-    return amoebaReferenceMultipoleForce;
+    return pgm_ReferenceMultipoleForce;
 
 }
 
 double ReferenceCalc_pGM_MultipoleForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
 
-    pGM_ReferenceMultipoleForce* amoebaReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
+    pGM_ReferenceMultipoleForce* pGM_ReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
 
     vector<Vec3>& posData = extractPositions(context);
     vector<Vec3>& forceData = extractForces(context);
-    double energy = amoebaReferenceMultipoleForce->calculateForceAndEnergy(posData, charges, dipoles, quadrupoles, tholes,
-                                                                           dampingFactors, polarity, axisTypes, 
-                                                                           multipoleAtomZs, multipoleAtomXs, multipoleAtomYs,
+    double energy = pGM_ReferenceMultipoleForce->calculateForceAndEnergy(posData, charges, dipoles, beta, polarity, 
                                                                            multipoleAtomCovalentInfo, forceData);
 
-    delete amoebaReferenceMultipoleForce;
+    delete pGM_ReferenceMultipoleForce;
 
     return static_cast<double>(energy);
 }
@@ -210,17 +194,16 @@ void ReferenceCalc_pGM_MultipoleForceKernel::getInducedDipoles(ContextImpl& cont
 
     // Create an _pGM_ReferenceMultipoleForce to do the calculation.
     
-    pGM_ReferenceMultipoleForce* amoebaReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
+    pGM_ReferenceMultipoleForce* pgm_ReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
     vector<Vec3>& posData = extractPositions(context);
     
     // Retrieve the induced dipoles.
     
     vector<Vec3> inducedDipoles;
-    amoebaReferenceMultipoleForce->calculateInducedDipoles(posData, charges, dipoles, quadrupoles, tholes,
-            dampingFactors, polarity, axisTypes, multipoleAtomZs, multipoleAtomXs, multipoleAtomYs, multipoleAtomCovalentInfo, inducedDipoles);
+    pgm_ReferenceMultipoleForce->calculateInducedDipoles(posData, charges, dipoles, beta, polarity, multipoleAtomCovalentInfo, inducedDipoles);
     for (int i = 0; i < numParticles; i++)
         outputDipoles[i] = inducedDipoles[i];
-    delete amoebaReferenceMultipoleForce;
+    delete pgm_ReferenceMultipoleForce;
 }
 
 void ReferenceCalc_pGM_MultipoleForceKernel::getLabFramePermanentDipoles(ContextImpl& context, vector<Vec3>& outputDipoles) {
@@ -229,17 +212,16 @@ void ReferenceCalc_pGM_MultipoleForceKernel::getLabFramePermanentDipoles(Context
 
     // Create an _pGM_ReferenceMultipoleForce to do the calculation.
     
-    pGM_ReferenceMultipoleForce* amoebaReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
+    pGM_ReferenceMultipoleForce* pgm_ReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
     vector<Vec3>& posData = extractPositions(context);
     
     // Retrieve the permanent dipoles in the lab frame.
     
     vector<Vec3> labFramePermanentDipoles;
-    amoebaReferenceMultipoleForce->calculateLabFramePermanentDipoles(posData, charges, dipoles, quadrupoles, tholes, 
-            dampingFactors, polarity, axisTypes, multipoleAtomZs, multipoleAtomXs, multipoleAtomYs, multipoleAtomCovalentInfo, labFramePermanentDipoles);
+    pgm_ReferenceMultipoleForce->calculateLabFramePermanentDipoles(posData, charges, dipoles, beta, polarity, multipoleAtomCovalentInfo, labFramePermanentDipoles);
     for (int i = 0; i < numParticles; i++)
         outputDipoles[i] = labFramePermanentDipoles[i];
-    delete amoebaReferenceMultipoleForce;
+    delete pgm_ReferenceMultipoleForce;
 }
 
 
@@ -249,35 +231,32 @@ void ReferenceCalc_pGM_MultipoleForceKernel::getTotalDipoles(ContextImpl& contex
 
     // Create an _pGM_ReferenceMultipoleForce to do the calculation.
     
-    pGM_ReferenceMultipoleForce* amoebaReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
+    pGM_ReferenceMultipoleForce* pgm_ReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
     vector<Vec3>& posData = extractPositions(context);
     
     // Retrieve the permanent dipoles in the lab frame.
     
     vector<Vec3> totalDipoles;
-    amoebaReferenceMultipoleForce->calculateTotalDipoles(posData, charges, dipoles, quadrupoles, tholes,
-            dampingFactors, polarity, axisTypes, multipoleAtomZs, multipoleAtomXs, multipoleAtomYs, multipoleAtomCovalentInfo, totalDipoles);
+    pgm_ReferenceMultipoleForce->calculateTotalDipoles(posData, charges, dipoles, beta, polarity, multipoleAtomCovalentInfo, totalDipoles);
 
     for (int i = 0; i < numParticles; i++)
         outputDipoles[i] = totalDipoles[i];
-    delete amoebaReferenceMultipoleForce;
+    delete pgm_ReferenceMultipoleForce;
 }
 
 
-
+/*
 void ReferenceCalc_pGM_MultipoleForceKernel::getElectrostaticPotential(ContextImpl& context, const std::vector< Vec3 >& inputGrid,
                                                                         std::vector< double >& outputElectrostaticPotential) {
 
-    pGM_ReferenceMultipoleForce* amoebaReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
+    pGM_ReferenceMultipoleForce* pgm_ReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
     vector<Vec3>& posData                                     = extractPositions(context);
     vector<Vec3> grid(inputGrid.size());
     vector<double> potential(inputGrid.size());
     for (unsigned int ii = 0; ii < inputGrid.size(); ii++) {
         grid[ii] = inputGrid[ii];
     }
-    amoebaReferenceMultipoleForce->calculateElectrostaticPotential(posData, charges, dipoles, quadrupoles, tholes,
-                                                                   dampingFactors, polarity, axisTypes, 
-                                                                   multipoleAtomZs, multipoleAtomXs, multipoleAtomYs,
+    pgm_ReferenceMultipoleForce->calculateElectrostaticPotential(posData, charges, dipoles, beta, polarity,
                                                                    multipoleAtomCovalentInfo, grid, potential);
 
     outputElectrostaticPotential.resize(inputGrid.size());
@@ -285,9 +264,9 @@ void ReferenceCalc_pGM_MultipoleForceKernel::getElectrostaticPotential(ContextIm
         outputElectrostaticPotential[ii] = potential[ii];
     }
 
-    delete amoebaReferenceMultipoleForce;
+    delete pgm_ReferenceMultipoleForce;
 }
-
+*/
 void ReferenceCalc_pGM_MultipoleForceKernel::getSystemMultipoleMoments(ContextImpl& context, std::vector< double >& outputMultipoleMoments) {
 
     // retrieve masses
@@ -298,17 +277,15 @@ void ReferenceCalc_pGM_MultipoleForceKernel::getSystemMultipoleMoments(ContextIm
         masses.push_back(system.getParticleMass(i));
     }    
 
-    pGM_ReferenceMultipoleForce* amoebaReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
+    pGM_ReferenceMultipoleForce* pgm_ReferenceMultipoleForce = setup_pGM_ReferenceMultipoleForce(context);
     vector<Vec3>& posData                                     = extractPositions(context);
-    amoebaReferenceMultipoleForce->calculate_pGM_SystemMultipoleMoments(masses, posData, charges, dipoles, quadrupoles, tholes,
-                                                                         dampingFactors, polarity, axisTypes, 
-                                                                         multipoleAtomZs, multipoleAtomXs, multipoleAtomYs,
+    pgm_ReferenceMultipoleForce->calculateSystemMultipoleMoments(masses, posData, charges, dipoles, beta, polarity,
                                                                          multipoleAtomCovalentInfo, outputMultipoleMoments);
 
-    delete amoebaReferenceMultipoleForce;
+    delete pgm_ReferenceMultipoleForce;
 }
 
-void ReferenceCalc_pGM_MultipoleForceKernel::copyParametersToContext(ContextImpl& context, const _pGM_MultipoleForce& force) {
+void ReferenceCalc_pGM_MultipoleForceKernel::copyParametersToContext(ContextImpl& context, const pGM_MultipoleForce& force) {
     if (numMultipoles != force.getNumMultipoles())
         throw OpenMMException("updateParametersInContext: The number of multipoles has changed");
 
@@ -318,17 +295,13 @@ void ReferenceCalc_pGM_MultipoleForceKernel::copyParametersToContext(ContextImpl
     int quadrupoleIndex = 0;
     for (int i = 0; i < numMultipoles; ++i) {
         int axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY;
-        double charge, tholeD, dampingFactorD, polarityD;
+        double charge, polarityD, betaD;
         std::vector<double> dipolesD;
-        std::vector<double> quadrupolesD;
-        force.getMultipoleParameters(i, charge, dipolesD, quadrupolesD, axisType, multipoleAtomZ, multipoleAtomX, multipoleAtomY, tholeD, dampingFactorD, polarityD);
-        axisTypes[i] = axisType;
-        multipoleAtomZs[i] = multipoleAtomZ;
-        multipoleAtomXs[i] = multipoleAtomX;
-        multipoleAtomYs[i] = multipoleAtomY;
+
+        force.getMultipoleParameters(i, charge, dipolesD, betaD, polarityD);
+
         charges[i] = charge;
-        tholes[i] = tholeD;
-        dampingFactors[i] = dampingFactorD;
+
         polarity[i] = polarityD;
         dipoles[dipoleIndex++] = dipolesD[0];
         dipoles[dipoleIndex++] = dipolesD[1];

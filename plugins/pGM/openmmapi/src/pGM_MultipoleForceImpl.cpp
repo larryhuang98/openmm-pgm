@@ -61,8 +61,7 @@ void pGM_MultipoleForceImpl::initialize(ContextImpl& context) {
         double cutoff = owner.getCutoffDistance();
         if (cutoff > 0.5*boxVectors[0][0] || cutoff > 0.5*boxVectors[1][1] || cutoff > 0.5*boxVectors[2][2])
             throw OpenMMException("pGM_MultipoleForce: "+Messages::cutoffTooLarge);
-    }
-
+    } 
     
     kernel = context.getPlatform().createKernel(Calc_pGM_MultipoleForceKernel::Name(), context);
     kernel.getAs<Calc_pGM_MultipoleForceKernel>().initialize(context.getSystem(), owner);
@@ -115,10 +114,6 @@ void pGM_MultipoleForceImpl::getTotalDipoles(ContextImpl& context, vector<Vec3>&
     kernel.getAs<Calc_pGM_MultipoleForceKernel>().getTotalDipoles(context, dipoles);
 }
 
-void pGM_MultipoleForceImpl::getElectrostaticPotential(ContextImpl& context, const std::vector< Vec3 >& inputGrid,
-                                                         std::vector< double >& outputElectrostaticPotential) {
-    kernel.getAs<Calc_pGM_MultipoleForceKernel>().getElectrostaticPotential(context, inputGrid, outputElectrostaticPotential);
-}
 
 void pGM_MultipoleForceImpl::getSystemMultipoleMoments(ContextImpl& context, std::vector< double >& outputMultipoleMoments) {
     kernel.getAs<Calc_pGM_MultipoleForceKernel>().getSystemMultipoleMoments(context, outputMultipoleMoments);
